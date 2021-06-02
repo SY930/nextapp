@@ -1,0 +1,7 @@
+// https://github.com/zchen9/code/issues/14
+{
+  "presets":["next/babel"],
+  "plugins": [
+    ["import", {"libraryName": "antd", "libraryDirectory": "lib", "style": true}]
+  ]
+}
