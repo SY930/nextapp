@@ -30,13 +30,14 @@ function getBodyParam(type, params) {
         Object.keys(params).forEach(key => {
             formData.append(key, params[key]);
         });
+        // console.log(formData, 'formData')
         return formData;
     }
     return getQueryParam(params);
 }
 
 function getQueryParam(params) {
-    console.log('params: ', params);
+    // console.log('params: ', params);
     const  p = Object.keys(params).map(key => {
         const val = params[key];
         if (Object.prototype.toString.call(val).indexOf('String') !== -1) {
@@ -47,7 +48,7 @@ function getQueryParam(params) {
     return p;
 }
 function getUrlParams(options) {
-    console.log('options: ', options);
+    // console.log('options: ', options);
     const { url, method, type, ...params} = options;
     const _m = method.toUpperCase();
     const _t = type.toUpperCase();
@@ -55,11 +56,17 @@ function getUrlParams(options) {
         let contentType = 'application/x-www-form-urlencoded;charset=UTF-8';
         if (type === 'JSON') contentType = 'application/json;charset=UTF-8';
         if (type === 'FORM') contentType = '';
+        if (type === '') contentType = '';
         return contentType ? { 'content-type': contentType } : {};
     };
     const _u = _m === 'GET' ? (`${url}?${getQueryParam(params)}`) : url;
     const body = _m === 'POST' ? { body: getBodyParam(_t, params) } : {}
-    const headers = { ...getContentType(_t) }; // token
+    // console.log('body---------: ', body);
+    let headers = { ...getContentType(_t) }; // token
+    // if ([url].includes('/crm_h/sain')) {
+    //     headers = {'content-type': 'application/x-www-form-urlencoded'}
+    // }
+    // console.log(headers, 'headers');
     return { url: _u, method: _m,  headers, ...body,}
 }
 
@@ -88,7 +95,7 @@ const fetchData = (url, options = {}) => {
                 } else {
                     Modal.error({
                         title: '啊哦！好像有问题呦~~',
-                        content: `${result.msg}`,
+                        content: `${result.msg || result.message}`,
                     });
                     reject(result)
                 }

@@ -9,68 +9,61 @@ import * as dayjs from 'dayjs';
 import { decode } from 'js-base64'
 import { fetchData, throttle, queryURLParams } from '../utils';
 import { WECHAT_MALL_ACTIVITIES } from '../config'
-// console.log('styles: ', styles);
-// import './home.less';
 
 
 
 // const { RangePicker } = DatePicker;
 // const { Option } = Select;
 
-
-const datas = [
-  {
-    key: '1',
-    name: 'John Brown',
-    money: '￥300,000.00',
-    address: 'New York No. 1 Lake Park',
-  },
-  {
-    key: '2',
-    name: 'Jim Green',
-    money: '￥1,256,000.00',
-    address: 'London No. 1 Lake Park',
-  },
-  {
-    key: '3',
-    name: 'Joe Black',
-    money: '￥120,000.00',
-    address: 'Sidney No. 1 Lake Park',
-  },
-];
-
 let throttleResize = null;
 const Home = () => {
 
   // const classes = useStyles();
-  const [clientWidth, setClintWidth] = useState(1001);
-  const [data, setData] = useState(datas);
-  const [total, setTotal] = useState(80);
+  // const [clientWidth, setClintWidth] = useState(1001);
+  const [data, setData] = useState([]);
+  const [total, setTotal] = useState();
   const [pageNo, setPageNo] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [form] = Form.useForm();
-  const handleChangeChecked = (value) => {
+  const [pageSize, setPageSize] = useState(20);
+  // const [form] = Form.useForm();
 
-    console.log('value: ', value);
+  const updateStatus = (info, value, record) => {
     const v = {
-      groupID: 11157,
-      shopID: 76311842,
-      promotionID: 1111,
+      ...info,
       status: value ? 1 : 0,
+      promotionID: record.promotionID
     }
-    fetchData('/crm_h/promotion_updatePromotionStatusByShop.ajax', v)
+    fetchData('/crm_h/promotion_updatePromotionStatusByShop.ajax', {  method: 'GET', type: '', ...v })
       .then((res) => {
         if (res.code === '000') {
-          message.success('修改成功')
+          message.success('修改成功');
+          getInitTableData();
+        } else {
+          message.error('修改失败')
         }
       })
+      .catch((error) => {
+        console.error(error);
+      })
+  }
+
+  const handleChangeChecked = (value, record) => {
+    getSigns({status: value ? 1 : 0, promotionID: record.promotionID}).then((res) => {
+      if (res.success === 'true' && res.code === '000') {
+        // setInfo(response.data);
+        updateStatus(res.data, value, record);
+        // ...
+      } else {
+        return message.error(res.msg || '请求失败！')
+      }
+    })
+    
   }
   // isActive 表示当前店铺的活动启动状态，因ProtoBuf的序列化问题，可能存在isActive=0的时候无此字段，因此当isActive不存在则和isActive=0同含义。
   // 为空判断
   const columns = () => ([
     {
       title: '序号',
-      dataIndex: 'key',
+      dataIndex: 'id',
       align: 'center',
     },
     {
@@ -80,19 +73,13 @@ const Home = () => {
       align: 'center',
       render: (text, record, index) => {
         const defaultChecked = (record.isActive == '1' ? true : false);
-        // const statusState = (
-        //     (record.eventWay == '50' || record.eventWay == '53')
-        //     &&
-        //     (record.status != '0' && record.status != '1' && record.status != '5' && record.status != '21')
-        // );
         return (
           <Switch
             // size="small"
             checkedChildren='启用'
             unCheckedChildren='暂停'
-            // checked={defaultChecked}
-            onChange={handleChangeChecked}
-          // disabled={(record.isActive == '-1' || statusState || isBrandOfHuaTianGroupList(this.props.user.accountInfo.groupID)) || record.eventWay === 80 ? true : false}
+            defaultChecked={defaultChecked}
+            onChange={(v) => handleChangeChecked(v, record)}
           />
         )
       }
@@ -102,84 +89,74 @@ const Home = () => {
       dataIndex: 'promotionType',
       render: (promotionType) => {
         const text = (WECHAT_MALL_ACTIVITIES.find(({ key }) => key === `${promotionType}`) || {}).title
-        return (<span title={text}>{text}</span>);
+        return (<span title={text}>{text || '--'}</span>);
       },
     },
     {
       title: '活动名称',
       dataIndex: 'promotionName',
       className: '',
-      // render: text => <a>{text}</a>,
+      render: (text) => (text || '--')
     },
     {
       title: '活动编码',
       dataIndex: 'promotionCode',
       className: '',
-      // render: text => <a>{text}</a>,
+      render: (text) => (text || '--')
     },
     {
       title: '有效时间',
-      dataIndex: 'excludedDate',
+      dataIndex: 'startDate',
       className: '',
-      // render: (validDate, record) => {
-      // return `${moment(record.startTime, 'YYYYMMDDHHmm').format('YYYY-MM-DD')} - ${moment(record.endTime, 'YYYYMMDDHHmm').format('YYYY-MM-DD')}`;
-      // },
-      // render: text => <a>{text}</a>,
+      render: (validDate, record) => {
+        //  dayjs(new Date()).format('YYYYMMDDHHmmss')
+        if (record.startDate == '0' || record.endDate == '0' ||
+          record.startDate == '20000101' || record.endDate == '29991231') {
+          return '不限制';
+        }
+        return validDate && record.endDate ? `${dayjs(record.startDate).format('YYYY-MM-DD HH:mm:ss')} - ${dayjs(record.endDate).format('YYYY-MM-DD HH:mm:ss')}` : '--';
+      }
     },
     {
       title: '有效状态',
-      dataIndex: 'excludedSubjectLst', // ??
+      dataIndex: 'isActive',
       className: '',
       align: 'center',
+      render: (text) => {
+        if (text == '1') {
+          return <span className={styles.open}>执行中</span>
+        } else if (text == '0') {
+          return  <span className={styles.puse}>暂停中</span>
+        }
+      }
     },
-    // {
-    //   title: '创建人/修改人',
-    //   dataIndex: 'createBy', // ??
-    //   className: '',
-    //   render: (text, record) => {
-    //     return `${text}/${record.modifiedBy}`
-    //   }
-    // },
     {
       title: '创建时间/修改时间',
-      dataIndex: 'createTime', // ??
+      dataIndex: 'createTime',
       className: '',
-      // render: (validDate, record) => {
-      // return `${moment(record.startTime, 'YYYYMMDDHHmm').format('YYYY-MM-DD')} - ${moment(record.endTime, 'YYYYMMDDHHmm').format('YYYY-MM-DD')}`;
-      // },
+      render: (validDate, record) => {
+        //  dayjs(new Date()).format('YYYYMMDDHHmmss')
+      return validDate ? `${dayjs(record.createTime).format('YYYY-MM-DD HH:mm:ss')} - ${dayjs(record.actionTime).format('YYYY-MM-DD HH:mm:ss')}` : '--';
+      },
     },
   ]);
 
-  const onResize = () => {
-    const clientWidth = document.body.clientWidth || document.documentElement.clientWidth;
-    console.log('clientWidth: ', clientWidth);
-    setClintWidth(clientWidth);
-
-  };
-
-  throttleResize = throttleResize || throttle(onResize, 300, 1000);
-
   const getTableData = (params) => {
-    const p = JSON.parse(params);
-    const v = {
-      groupID: p.groupID,
-      shopID: p.shopID,
-      timestamp: dayjs(new Date()).format('YYYYMMDDHHmmss'),
-      // promotionID: 1111,
-      // status: 1,
-      devKey: 'hualala.',
-      sign: '1dd7ef30e37030fcb5eeb3cbec90df5',
-    }
-    fetchData('/crm_h/promotion_updatePromotionStatusByShop.ajax?devKey=hualala', v)
+    const p = params;
+    ///crm_h/promotion_getPromotionByShop.ajax?groupID=${groupID}&shopID=${shopID}&timestamp=${timestamp}&devKey=${devKey}&sign=${sign}
+    fetchData(`/crm_h/promotion_getPromotionByShop.ajax`, {  method: 'GET', type: '', ...p })
       .then((res) => {
         const data = { promotionLst: [], ...res.data };
-        const pageObj = { pageNo: +data.pageNo, total: +data.totalSize };
+        // const pageObj = { pageNo: +data.pageNo, total: +data.totalSize };
         if (data.promotionLst && data.promotionLst.length > 0) {
-          setData(data.promotionLst);
-          setTotal(pageObj.total);
-          setPageSize(data.pageNo);
+          const pageObj = data.page;
+          const dataList = data.promotionLst.map((item, id) => ({ ...item.master, id}))
+          console.log('dataList: ', dataList);
+          setData(dataList);
+          setTotal(pageObj.totalSize);
+          setPageSize(pageObj.pageSize);
         } else {
-          // setData([]);
+          setData([]);
         }
       })
       .catch((err) => { console.log(err) });
@@ -199,44 +176,45 @@ const Home = () => {
     return {};
   }
 
-  const getSains = (params) => {
-    const value = JSON.parse(params);
-
-    console.log('params: ', JSON.parse(params));
-    // return new Promise((resolve, reject) => {
-      return fetchData('/crm_h/sain', { type: 'FORM', accesstoken: 'MDB_EMPLOYEE_SESSIONd3bd217f2b574f6b9d7b1892778bf13b' || '', ...value, ip: 'http://192.168.7.77:8090/saas/out/get'})
+  const getSains = (params, options = {}) => {
+      return fetchData('/crm_h/sain', {...options, accessToken: 'MDB_EMPLOYEE_SESSIONd3bd217f2b574f6b9d7b1892778bf13b' || '', ip: 'http://192.168.7.77:8090/saas/out/get'})
         .then((res) => {
-          console.log(res, 'res')
-          // resolve(res)
           return res
         })
         .catch((err) => {
-          // reject(err)
           return err
         })
-    // })
   }
 
 
-  useEffect(() => {
-    onResize();
-    window.addEventListener('resize', throttleResize, false);
-    return () => {
-      window.removeEventListener('resize', throttleResize, false);
-    };
-  }, [throttleResize]);
-
-  useEffect(() => {
-
+  // useEffect(() => {
+  //   onResize();
+  //   window.addEventListener('resize', throttleResize, false);
+  //   return () => {
+  //     window.removeEventListener('resize', throttleResize, false);
+  //   };
+  // }, [throttleResize]);
+  const getSigns = (options = {}) => {
     const getUrlParams = getParams();
-    // console.log('getUrlParams: ', getUrlParams);
     async function getSain(getUrlParams) {
-      const response = await getSains(getUrlParams);
-      console.log('response: ', response);
-      // getTableData(getUrlParams);
-      // ...
+      const response = await getSains({...JSON.parse(getUrlParams)}, {...options});
+      return response;
     }
-    getSain(getUrlParams);
+    return getSain(getUrlParams);
+  }
+
+  const getInitTableData = () => {
+    getSigns().then((res) => {
+      if (res.success === 'true' && res.code === '000') {
+        getTableData(res.data);
+      } else {
+        return message.error(res.msg || '请求失败！')
+      }
+   });
+  }
+
+  useEffect(() => {
+    getInitTableData();
   }, [pageNo, pageSize])
 
   const handleChangePage = (currentPage, curPageSize) => {
@@ -256,7 +234,7 @@ const Home = () => {
         <Table
           columns={columns()}
           dataSource={data}
-          rowKey="key"
+          rowKey="id"
           pagination={{
             pageSize,
             pageNo,

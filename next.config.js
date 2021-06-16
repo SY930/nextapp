@@ -1,31 +1,28 @@
 const webpack = require('webpack');
-const withLess = require('@zeit/next-less')
+// const withLess = require('@zeit/next-less')
 const cssLoaderConfig = require("@zeit/next-css/css-loader-config")
 const lessToJS = require('less-vars-to-js')
-// 修复引入 @ycg包问题，如果没有引入就不需要
-// const withPlugins = require('next-compose-plugins')
-// const withTM = require('next-transpile-modules')(['@ycg/components', '@ycg/widgets'])
 
 const fs = require('fs')
 const path = require('path')
+const Dotenv = require('dotenv');
 
-// const packageJson = require('./package.json')
-// const projectName = `${packageJson.name}`.replace('-frontend', '')
-
-// const __DEV__ = process.env.NODE_ENV === 'development'
-// const SERVER_ENV = process.env.SERVER_ENV || 'prod';
+const envPath = path.join(__dirname, './.env');
+const isExistENV = fs.existsSync(envPath);
+if (isExistENV) {
+  Dotenv.config({
+    path: envPath,
+    safe: true,
+    systemvars: true,
+  });
+}
 
 // Where your antd-custom.less file lives
 const themeVariables = lessToJS(
   fs.readFileSync(path.resolve(__dirname, './styles/antd-custom.less'), 'utf8')
 )
 
-// 修复引入 @ycg包问题，如果没有引入就不需要
-// module.exports = withPlugins([withLess, withTM], {
 module.exports = {
-//   distDir: __DEV__ ? './.next' : './dist',
-  // 只有生产，才做cdn
-//   assetPrefix: SERVER_ENV === 'prod' ? `https://jcsnew.mycaigou.com/${projectName}` : '',
   devIndicators: {
     autoPrerender: false
   },
@@ -73,7 +70,7 @@ module.exports = {
       cssModules: true,
       cssLoaderOptions: {
         importLoaders: 1,
-        localIdentName: "[local]___[hash:base64:5]",
+        localIdentName: process.env.NODE_ENV !== 'production' ? '[local]___[hash:base64:5]' : '[hash:base64:8]',
       },
     });
 
@@ -101,15 +98,9 @@ module.exports = {
       use: less,
     });
 
-    config.plugins.push(
-      new webpack.EnvironmentPlugin([
-        'NODE_ENV',
-        'SERVER_ENV',
-        'PORT',
-        'HTTPS',
-      ])
-    )
-    config.resolve.alias['src'] = path.join(__dirname, 'src')
     return config
+  },
+  publicRuntimeConfig: {
+    BASE_URL: process.env.BASE_URL,
   },
 }
